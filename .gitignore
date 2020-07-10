@@ -5,6 +5,12 @@ __pycache__/
 
 # C extensions
 *.so
+.gitignore
+.idea
+.DS_Store
+
+# 作业一提交文件
+sample_submission.csv
 
 # Distribution / packaging
 .Python
