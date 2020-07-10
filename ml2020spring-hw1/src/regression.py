@@ -39,7 +39,7 @@ def loadTestData(testDataFile):
     testData = pd.read_csv(testDataFile, encoding='big5', header=None)
     testData = testData.iloc[:, 2:]
     testData[testData == 'NR'] = 0
-    testDataArray = testData.to_numpy()
+    testDataArray = testData.to_numpy().astype('float64')
     rows, column = testDataArray.shape
     Data = []
     for day in range(rows // 18):
@@ -95,6 +95,7 @@ def MBGD(param, lr, features, labels):
     new_param = (new_w, new_b)
     return new_param
 
+
 def normalization(data):
     """
     对数据进行归一化
@@ -102,8 +103,9 @@ def normalization(data):
     mu = np.mean(data, axis=0)
     sigma = np.std(data, axis=0)
     result = (data - mu) / sigma
-    result =  np.nan_to_num(result)
+    result = np.nan_to_num(result)
     return result
+
 
 def SGD(param, lr, features, y):
     """
@@ -125,11 +127,18 @@ def SGD(param, lr, features, y):
     return (np.array(new_w), np.array(new_b))
 
 
+def save2csv(predict, path='../data/sample_submission.csv'):
+    testData = pd.read_csv(path,index_col=None)
+    testData['value'] = predict
+    print(testData.columns)
+    testData.to_csv(path, index=0)
+
+
 if __name__ == '__main__':
     # 定义一些超参数
     learningRate = 1e-4
-    batchSize = 32
-    epoch = 10
+    batchSize = 128
+    epoch = 1000
 
     # 加载数据集
     Data, Label = loadTrainData('../data/train.csv')
@@ -150,19 +159,34 @@ if __name__ == '__main__':
     # 开始训练
     loss = 0
     losslist = []
+    LossListVaild = []
     for e in range(epoch):
-        for i, (train, label) in enumerate(dataIter(batchSize=batchSize, feature=TrainData, label=TrainLabel, shuffle=True)):
-            loss = 0
+        loss = 0
+        lossVaild = 0
+        for i, (train, label) in enumerate(
+                dataIter(batchSize=batchSize, feature=TrainData, label=TrainLabel, shuffle=True)):
             train = normalization(train)
             predict = regression(train, param)
-            loss = Loss(predict, label)
+            loss += Loss(predict, label)
             param = MBGD(param, learningRate, train, label)
             # for j, item in enumerate(train):
             #     param = SGD(param, learningRate, item, label[j])
-            if (i + 1) % 5000:
-                print("epoch: {}, {} / {}, loss: {}".format(e + 1, i + 1, len(TrainLabel) // batchSize, loss))
-                losslist.append(loss)
-                losslist.append(loss)
+        print("epoch: {}, train loss: {}".format(e + 1, loss / (len(TrainLabel) * 4)), end='')
+        losslist.append(loss / (4 * len(TrainLabel)))
+        for i, (vaild, label_vaild) in enumerate(
+                dataIter(batchSize=batchSize, feature=VaildData, label=VaildLabel, shuffle=True)):
+            vaild = normalization(vaild)
+            predictVaild = regression(vaild, param)
+            lossVaild += Loss(predictVaild, label_vaild)
+        print(" vaild loss: {}".format(lossVaild / len(VaildLabel)))
+        LossListVaild.append(lossVaild / len(VaildLabel))
+
     # print(predict)
-    plt.plot(list(range(len(losslist))),losslist)
+    plt.plot(list(range(len(losslist))), losslist, label='train')
+    plt.plot(list(range(len(losslist))), LossListVaild, label='vaild')
+    plt.legend(loc='upper right')
     plt.show()
+
+    # 在训练集上进行预测
+    predictTest = regression(TestData, param)
+    # save2csv(predictTest)
